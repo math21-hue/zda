@@ -1,0 +1,210 @@
+import { useState, useEffect } from "react";
+
+const timeSlots = [
+  "11h30 - 12h00",
+  "12h00 - 12h30",
+  "12h30 - 13h00",
+  "13h00 - 13h30",
+  "13h30 - 14h00",
+];
+const maxReservations = 40;
+
+export default function ReservationForm() {
+  const [reservations, setReservations] = useState({});
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [timeSlot, setTimeSlot] = useState("");
+  const [menuChoice, setMenuChoice] = useState("");
+
+  // Créer un objet de suivi des places disponibles pour chaque créneau
+  const [slotsAvailable, setSlotsAvailable] = useState(
+    timeSlots.reduce((acc, slot) => {
+      acc[slot] = maxReservations; // Initialisation avec 40 places disponibles pour chaque créneau
+      return acc;
+    }, {})
+  );
+
+  // Charger les réservations existantes depuis localStorage au démarrage
+  useEffect(() => {
+    const storedReservations = JSON.parse(localStorage.getItem("reservations"));
+    if (storedReservations) {
+      setReservations(storedReservations);
+
+      // Mettre à jour le nombre de places disponibles
+      let updatedSlots = { ...slotsAvailable };
+      Object.keys(storedReservations).forEach((slot) => {
+        updatedSlots[slot] -= storedReservations[slot].length;
+      });
+      setSlotsAvailable(updatedSlots);
+    }
+  }, []);
+
+  // Sauvegarder les réservations dans localStorage à chaque modification
+  useEffect(() => {
+    if (Object.keys(reservations).length > 0) {
+      localStorage.setItem("reservations", JSON.stringify(reservations));
+    }
+  }, [reservations]);
+
+  const handleReservation = () => {
+    if (!name || !phone || !timeSlot || !menuChoice)
+      return alert("Veuillez remplir tous les champs");
+
+    // Vérification du nombre de réservations dans le créneau sélectionné
+    if (slotsAvailable[timeSlot] <= 0) {
+      return alert("Ce créneau est complet");
+    }
+
+    const newReservation = { name, phone, menuChoice };
+
+    setReservations((prev) => {
+      const updatedReservations = { ...prev };
+
+      if (!updatedReservations[timeSlot]) {
+        updatedReservations[timeSlot] = [];
+      }
+
+      // Ajout de la nouvelle réservation
+      updatedReservations[timeSlot].push(newReservation);
+      return updatedReservations;
+    });
+
+    // Mettre à jour le nombre de places disponibles
+    setSlotsAvailable((prev) => ({
+      ...prev,
+      [timeSlot]: prev[timeSlot] - 1,
+    }));
+
+    alert(
+      `Réservation confirmée pour ${name} à ${timeSlot}, Menu: ${menuChoice}`
+    );
+    setName("");
+    setPhone("");
+    setMenuChoice(""); // Réinitialiser les champs de saisie
+  };
+
+  const resetReservations = () => {
+    localStorage.removeItem("reservations"); // Supprimer les réservations du localStorage
+    setReservations({}); // Réinitialiser l'état des réservations
+    setSlotsAvailable(
+      timeSlots.reduce((acc, slot) => {
+        acc[slot] = maxReservations; // Réinitialiser les places disponibles
+        return acc;
+      }, {})
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center py-12">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full">
+        <h2 className="text-3xl font-semibold text-center text-white mb-6">
+          Réservation Food Truck
+        </h2>
+
+        {/* Formulaire de réservation */}
+        <div className="mb-4">
+          <label className="block text-lg font-medium text-white">Nom</label>
+          <input
+            type="text"
+            placeholder="Nom"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full p-3 mt-2 border-2 border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-lg font-medium text-white">
+            Téléphone
+          </label>
+          <input
+            type="tel"
+            placeholder="Téléphone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full p-3 mt-2 border-2 border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-lg font-medium text-white">
+            Choisir un créneau
+          </label>
+          <select
+            onChange={(e) => setTimeSlot(e.target.value)}
+            value={timeSlot} // Lier au state pour garder la sélection
+            className="w-full p-3 mt-2 border-2 border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            <option value="">Sélectionner</option>
+            {timeSlots.map((slot) => (
+              <option
+                key={slot}
+                value={slot}
+                disabled={slotsAvailable[slot] <= 0} // Désactiver si plus de places disponibles
+              >
+                {slot} ({slotsAvailable[slot]} place restante
+                {slotsAvailable[slot] !== 1 ? "s" : ""})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-lg font-medium text-white">
+            Choisir un menu
+          </label>
+          <select
+            onChange={(e) => setMenuChoice(e.target.value)}
+            value={menuChoice} // Lier au state pour garder la sélection
+            className="w-full p-3 mt-2 border-2 border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            <option value="">Sélectionner</option>
+            <option value="Classic">Menu Classic</option>
+            <option value="Végétarien">Menu Végétarien</option>
+          </select>
+        </div>
+
+        <button
+          onClick={handleReservation}
+          className="w-full py-3 px-4 bg-teal-600 text-white font-bold rounded-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-300"
+        >
+          Réserver
+        </button>
+
+        {/* Bouton pour réinitialiser les réservations */}
+        <button
+          onClick={resetReservations}
+          className="w-full py-3 px-4 bg-red-600 text-white font-bold rounded-md mt-4 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+        >
+          Réinitialiser les réservations
+        </button>
+
+        {/* Section pour afficher les réservations détaillées */}
+        <div className="mt-8">
+          <h3 className="text-xl font-semibold text-white mb-4">
+            Réservations
+          </h3>
+          <div className="text-white">
+            {Object.keys(reservations).map((slot) => (
+              <div key={slot} className="mb-4">
+                <h4 className="text-lg font-semibold">{slot}</h4>
+                <ul>
+                  {Array.isArray(reservations[slot]) &&
+                    reservations[slot].map((reservation, index) => (
+                      <li key={index} className="mb-2">
+                        <strong>Nom</strong>: {reservation.name}
+                        <br />
+                        <strong>Téléphone</strong>: {reservation.phone}
+                        <br />
+                        <strong>Menu</strong>: {reservation.menuChoice}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
